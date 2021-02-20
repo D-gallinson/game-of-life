@@ -3,12 +3,13 @@ class Board:
 		self.UNDERPOP = underpop
 		self.OVERPOP = overpop
 		self.REPRO = repro
-		self.alive = self.__init_living(pattern)
+		self.alive = self.count_living(pattern)
 		if self.alive == 0:
 			raise Exception("Please initialize the simulation with at least 1 living cell")
-		self.board = self.__pad_board(pattern)
+		self.board = self.__prep_board(pattern)
 		self.height = len(self.board)
 		self.width = len(self.board[0])
+		self.change_flag = False
 
 
 	def __str__(self):
@@ -29,7 +30,13 @@ class Board:
 				new_cell = self.__change_cell_state(cell, neighbors)
 				new_row.append(new_cell)
 			new_board.append(new_row)
-		self.board = new_board
+		if not self.change_flag:
+			print("STABLE!")
+		self.change_flag = False
+		self.board = self.__prep_board(new_board)
+		self.height = len(self.board)
+		self.width = len(self.board[0])
+		self.alive = self.count_living(new_board)
 
 
 	def check_surroundings(self, row, col, cell):
@@ -58,7 +65,7 @@ class Board:
 		return alive
 
 
-	def __init_living(self, pattern):
+	def count_living(self, pattern):
 		living = 0
 		for row in pattern:
 			living += sum(row)
@@ -68,38 +75,91 @@ class Board:
 	def __change_cell_state(self, cell, neighbors):
 		if cell == 0:
 			if neighbors == self.REPRO:
+				self.change_flag = True
 				return 1
 		else:
 			if neighbors < self.UNDERPOP or neighbors > self.OVERPOP:
+				self.change_flag = True
 				return 0
 		return cell
 
+
+	def __prep_board(self, board):
+		board = self.__pad_board(board)
+		board = self.__purge_deadzones(board)
+		return board
+
 	
-	def __pad_board(self, pattern):
+	def __pad_board(self, board):
 		longest_row = 0
 
-		if any(self.__get_col(pattern, 0)):
-			pattern = [[0] + row for row in pattern]
-		if any(self.__get_col(pattern, -1)):
-			pattern = [row + [0] for row in pattern]
+		if any(self.__get_col(board, 0)):
+			board = [[0] + row for row in board]
+		if any(self.__get_col(board, -1)):
+			board = [row + [0] for row in board]
 
-		for row in pattern:
+		for row in board:
 			row_len = len(row)
 			if row_len > longest_row:
 				longest_row = row_len
 
-		for row in pattern:
+		for row in board:
 			row_len = len(row)
 			if row_len < longest_row:
 				mult = longest_row - row_len
 				row += [0 for _ in range(mult)]
 
-		if any(pattern[0]):
-			pattern.insert(0, [0 for _ in range(longest_row)])
-		if any(pattern[-1]):
-			pattern.append([0 for _ in range(longest_row)])
+		if any(board[0]):
+			board.insert(0, [0 for _ in range(longest_row)])
+		if any(board[-1]):
+			board.append([0 for _ in range(longest_row)])
 
-		return pattern
+		return board
+
+
+	def __purge_deadzones(self, board):
+		directions = ["N", "E", "S", "W"]
+		for direction in directions:
+			board = self.__purge_cardinal(direction, board)
+		return board
+
+
+	#Takes in a matrix and removes any rows or cols such that at least two contiguous rows/cols contain
+	#all zeros. Maintains the 0 pad. Direction corresponds to the direction that deadzones should be purged
+	#(e.g. getting rid of right-column deadzones corresponds to direction="E").
+	#NOTE: Expects that all rows are of the same length (run __pad_board() first to ensure this is true)
+	def __purge_cardinal(self, direction, board):
+		if direction == "N" or direction == "W":
+			i = 0
+			iter = 1
+		else:
+			i = len(board)-1 if direction == "S" else len(board[0])-1
+			iter = -1
+
+		deadzones = 0
+		is_dead = True
+		while is_dead:
+			if direction == "N" or direction == "S":
+				side = board[i]
+			else:
+				side = self.__get_col(board, i)
+			is_dead = not any(side)
+			i += iter
+
+		if direction == "N":
+			start = i - 2 if i - 2 >= 0 else 0
+			board = board[start:]
+		elif direction == "S":
+			end = i + 3 if i + 3 <= len(board) else len(board)
+			board = board[:end]
+		elif direction == "W":
+			start = i - 2 if i - 2 >= 0 else 0
+			board = [row[start:] for row in board]
+		else:
+			end = end = i + 3 if i + 3 <= len(board[0]) else len(board[0])
+			board = [row[:end] for row in board]
+
+		return board
 
 
 	def __get_col(self, mat, i):
@@ -113,10 +173,21 @@ pattern = [
 ]
 
 game = Board(pattern)
+print(game.alive)
 print(game)
+
 game.update()
+print(game.alive)
 print(game)
+
 game.update()
+print(game.alive)
 print(game)
+
 game.update()
+print(game.alive)
+print(game)
+
+game.update()
+print(game.alive)
 print(game)
